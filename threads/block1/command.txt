@@ -1,0 +1,8 @@
+watch -n 1 cat /proc/pid/maps
+strace -f ./thread-example 2>&1 | grep clone
+strace -f ./thread-example
+valgrind --leak-check=full ./thread-example
+gcc -g -Wall -I"." thread1.1c.c -lpthread -o thread-example
+./thread-example
+watch -n 1 ps --ppid 19555 -L
+cat /proc/pid/status

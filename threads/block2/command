@@ -1,0 +1,4 @@
+#!/bin/bash
+gcc -c -fPIC mythread.c -o mythread.o
+gcc mythread.o -shared -o libmythread.so
+gcc main.c -L. -lmythread -o main
