@@ -8,9 +8,12 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/types.h>
+#include <ucontext.h>
 #include <unistd.h>
 
 #include "mythread.h"
+
+/* mythread_t gtid; */
 
 int mythread_startup(void *arg) {
   mythread_struct_t *mythread = (mythread_t)arg;
@@ -19,18 +22,17 @@ int mythread_startup(void *arg) {
 
   if (!mythread->canceled)
     mythread->retval = mythread->start_routine(mythread->arg);
-  /* printf("%s\n", mythread->retval); */
 
   mythread->finished = 1;
 
   while (!mythread->joined) {
     usleep(1);
   }
-  /* printf("Next\n"); */
 
   if (munmap(mythread->stack, STACK_SIZE - PAGE) == -1) {
     perror("munmap");
   }
+  size--;
 
   return 0;
 }
@@ -41,6 +43,7 @@ void *create_stack(off_t size) {
     perror("open");
     return NULL;
   }
+  ftruncate(fd, 0);
   if (ftruncate(fd, size) == -1) {
     perror("ftruncate");
     close(fd);
@@ -49,13 +52,12 @@ void *create_stack(off_t size) {
 
   void *stack;
 
-  stack = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  stack = mmap(NULL, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (stack == MAP_FAILED) {
     perror("mmap");
     return NULL;
   }
-
-  memset(stack, 0xFF, size);
+  close(fd);
 
   return stack;
 }
@@ -68,10 +70,13 @@ int mythread_create(mythread_t *mytid, void *(start_routine)(void *),
   void *child_stack;
   int flags;
   child_stack = create_stack(STACK_SIZE);
+  printf("%p\n", child_stack);
   if (child_stack == NULL) {
     fprintf(stderr, "create_stack() failed\n");
     return -1;
   }
+  mprotect(child_stack + PAGE, STACK_SIZE - PAGE, PROT_READ | PROT_WRITE);
+  memset(child_stack + PAGE, 'a', STACK_SIZE - PAGE);
 
   mythread = (mythread_struct_t *)(child_stack + STACK_SIZE -
                                    sizeof(mythread_struct_t));
@@ -87,44 +92,60 @@ int mythread_create(mythread_t *mytid, void *(start_routine)(void *),
   thread_num++;
 
   child_stack = (void *)mythread;
-
   flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD;
   int child_pid = clone(mythread_startup, child_stack, flags, (void *)mythread);
+  printf("%d\n", child_pid);
+  if (size < MAX_THREAD) {
+    table[size].thread_id = child_pid;
+    table[size++].thread = mythread;
+  }
+  /* gtid = mythread; */
   if (child_pid == -1) {
     perror("clone");
     return -1;
   }
   *mytid = mythread;
-  printf("tid = %d\n", (*mytid)->id);
 
   return 0;
 }
 
 void mythread_join(mythread_t mytid, void **retval) {
-  mythread_t mythread = mytid;
   /* printf("%d\n", mythread->finished); */
-  while (!mythread->finished) {
+  while (!mytid->finished) {
     usleep(1);
   }
 
-  *retval = mythread->retval;
-
-  mythread->joined = 1;
-  mythread_testcancel(mytid);
+  *retval = mytid->retval;
+  mytid->joined = 1;
 }
 
 void mythread_cancel(mythread_t mytid) {
-  mytid->retval = (void *)"canceled";
+  mytid->retval = "canceled";
   mytid->canceled = 1;
 }
 
-void mythread_testcancel(mythread_t mytid) {
-  if (mytid->canceled) {
-    /* printf("Yep\n"); */
-    setcontext(&(mytid->before_start_routine));
+void mythread_testcancel(void) {
+  mythread_t thread = NULL;
+  int tid = gettid();
+  for (int i = 0; i < size; i++) {
+    if (table[i].thread_id == tid) {
+      thread = table[i].thread;
+      break;
+    }
+  }
+
+  if (thread != NULL && thread->canceled) {
+    setcontext(&(thread->before_start_routine));
+    /* if (gtid->canceled) { */
+    /*   setcontext(&(gtid->before_start_routine)); */
   }
 }
 
 int mythread_equal(mythread_t m1, mythread_t m2) {
   return m1->id == m2->id ? 1 : 0;
+}
+
+int mythread_self() {
+  int tid = gettid();
+  return tid;
 }

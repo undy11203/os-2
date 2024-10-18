@@ -1,0 +1,4 @@
+#!/bin/bash
+gcc -c -fPIC uthread.c -o uthread.o
+gcc uthread.o -shared -o libuthread.so
+gcc main.c -L. -luthread -o main
