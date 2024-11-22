@@ -13,7 +13,7 @@
 
 #include "uthread.h"
 
-uthread_list_t list_thread;
+uthread_list_t list_thread = {0};
 
 void *create_stack(off_t size) {
   void *stack;
@@ -33,36 +33,46 @@ int uthread_startup(void *arg) {
   void *retval = NULL;
 
   printf("uthread_startup: starting a thread func %d\n", uthread->uthread_id);
-  uthread->start_routine(uthread->arg);
 
-  uthread->retval = retval;
+  uthread->retval = uthread->start_routine(uthread->arg);
+  printf("res %s\n", (char *)uthread->retval);
+
   uthread->finished = 1;
+  list_thread.uthread_count--;
 
   return 0;
 }
 
-void uthread_scheduler() {
+int uthread_scheduler() {
   int err;
   ucontext_t *cur_ctx, *next_ctx;
   /* printf("sheduler cur %d\n", list_thread.uthread_cur); */
 
   cur_ctx = &(list_thread.uthreads[list_thread.uthread_cur]->ucontext);
 
+  if (list_thread.uthread_count <= 1) {
+    printf("es\n");
+    return 1;
+  }
+
   do {
-    list_thread.uthread_cur =
-        (list_thread.uthread_cur + 1) % list_thread.uthread_count;
-  } while (list_thread.uthreads[list_thread.uthread_cur]->finished);
+    list_thread.uthread_cur = (list_thread.uthread_cur + 1) % MAX_THREADS;
+
+  } while (list_thread.uthreads[list_thread.uthread_cur] == NULL ||
+           list_thread.uthreads[list_thread.uthread_cur]->finished);
 
   next_ctx = &(list_thread.uthreads[list_thread.uthread_cur]->ucontext);
-
   err = swapcontext(cur_ctx, next_ctx);
   if (err == -1) {
     perror("sheduler: swapcontext() failed:");
     exit(1);
   }
+  return 0;
 }
 
 int uthread_create(uthread_t *uthread, void(*start_routine), void *arg) {
+  if (list_thread.uthread_count >= MAX_THREADS)
+    return -1;
   static int uthread_id = 0;
   uthread_t new_uthread;
   void *stack;
@@ -95,8 +105,13 @@ int uthread_create(uthread_t *uthread, void(*start_routine), void *arg) {
   new_uthread->arg = arg;
   new_uthread->finished = 0;
 
-  list_thread.uthreads[list_thread.uthread_count] = new_uthread;
-  list_thread.uthread_count++;
+  for (int i = 1; i < MAX_THREADS; i++) {
+    if (list_thread.uthreads[i] == NULL) {
+      list_thread.uthreads[i] = new_uthread;
+      list_thread.uthread_count++;
+      break;
+    }
+  }
   printf("thread create: thread count %d\n", list_thread.uthread_count);
 
   *uthread = new_uthread;

@@ -9,7 +9,7 @@
 typedef struct {
   int uthread_id;
 
-  void (*start_routine)(void *);
+  void *(*start_routine)(void *);
 
   void *arg;
   void *retval;
@@ -30,6 +30,6 @@ extern uthread_list_t list_thread;
 
 int uthread_create(uthread_t *uthread, void(*start_routine), void *arg);
 int thread_is_finished(uthread_t utid);
-void uthread_scheduler();
+int uthread_scheduler();
 
 #endif

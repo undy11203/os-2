@@ -7,7 +7,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-void mythread_func_1(void *arg) {
+void *mythread_func_1(void *arg) {
   char *str = (char *)arg;
   // printf("mythread1 started -- ");
   for (int i = 0; i < 5; i++) {
@@ -15,9 +15,10 @@ void mythread_func_1(void *arg) {
     sleep(1);
     uthread_scheduler();
   }
+  return "hello1";
 }
 
-void mythread_func_2(void *arg) {
+void *mythread_func_2(void *arg) {
   char *str = (char *)arg;
   // printf("mythread2 started -- ");
   for (int i = 0; i < 5; i++) {
@@ -25,9 +26,10 @@ void mythread_func_2(void *arg) {
     sleep(1);
     uthread_scheduler();
   }
+  return "hello2";
 }
 
-void mythread_func_3(void *arg) {
+void *mythread_func_3(void *arg) {
   char *str = (char *)arg;
   // printf("mythread3 started -- ");
   for (int i = 0; i < 5; i++) {
@@ -35,6 +37,7 @@ void mythread_func_3(void *arg) {
     sleep(1);
     uthread_scheduler();
   }
+  return "hello3";
 }
 
 int main() {
@@ -58,21 +61,8 @@ int main() {
 
   while (1) {
     printf("main sheduler\n");
-
-    for (int i = 1; i < list_thread.uthread_count; i++) {
-      if (!list_thread.uthreads[i]->finished) {
-        isFinish = 0;
-      } else {
-        break;
-      }
-    }
-
-    if (!isFinish) {
-      uthread_scheduler();
-      isFinish = 1;
-    } else {
+    if (uthread_scheduler() == 1)
       break;
-    }
   }
   printf("finish work programm\n");
 }

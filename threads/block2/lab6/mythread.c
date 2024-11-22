@@ -32,6 +32,7 @@ int mythread_startup(void *arg) {
   if (munmap(mythread->stack, STACK_SIZE - PAGE) == -1) {
     perror("munmap");
   }
+  free(mythread);
   size--;
 
   return 0;
@@ -64,13 +65,16 @@ void *create_stack(off_t size) {
 
 int mythread_create(mythread_t *mytid, void *(start_routine)(void *),
                     void *arg) {
+  if (size >= MAX_THREAD) {
+    return -1;
+  }
   static int thread_num = 0;
 
   mythread_struct_t *mythread;
   void *child_stack;
   int flags;
   child_stack = create_stack(STACK_SIZE);
-  printf("%p\n", child_stack);
+  /* printf("%p\n", child_stack); */
   if (child_stack == NULL) {
     fprintf(stderr, "create_stack() failed\n");
     return -1;
@@ -95,9 +99,14 @@ int mythread_create(mythread_t *mytid, void *(start_routine)(void *),
   flags = CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD;
   int child_pid = clone(mythread_startup, child_stack, flags, (void *)mythread);
   printf("%d\n", child_pid);
-  if (size < MAX_THREAD) {
-    table[size].thread_id = child_pid;
-    table[size++].thread = mythread;
+  for (int i = 0; i < MAX_THREAD; i++) {
+    if (table[i].thread == NULL) {
+      table[i].thread_id = child_pid;
+      table[i].thread = mythread;
+      size++;
+      printf("create %d\n", size);
+      break;
+    }
   }
   /* gtid = mythread; */
   if (child_pid == -1) {
@@ -136,8 +145,6 @@ void mythread_testcancel(void) {
 
   if (thread != NULL && thread->canceled) {
     setcontext(&(thread->before_start_routine));
-    /* if (gtid->canceled) { */
-    /*   setcontext(&(gtid->before_start_routine)); */
   }
 }
 
