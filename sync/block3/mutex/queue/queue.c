@@ -1,13 +1,11 @@
 #define _GNU_SOURCE
 #include <assert.h>
 #include <pthread.h>
-#include <semaphore.h>
 
 #include "queue.h"
+#include "../mutex/mutex.h"
 
-sem_t write_sem;
-sem_t read_sem;
-sem_t lock_sem;
+mutex_t mutex;
 
 void *qmonitor(void *arg) {
   queue_t *q = (queue_t *)arg;
@@ -23,7 +21,6 @@ void *qmonitor(void *arg) {
 }
 
 queue_t *queue_init(int max_count) {
-  /* int err; */
 
   queue_t *q = malloc(sizeof(queue_t));
   if (!q) {
@@ -39,14 +36,9 @@ queue_t *queue_init(int max_count) {
   q->add_attempts = q->get_attempts = 0;
   q->add_count = q->get_count = 0;
 
-  int err = sem_init(&write_sem, 0, max_count);
-    if (err) printf("sem_init() failed: %s\n", strerror(err));
-  err = sem_init(&read_sem, 0, 0);
-    if (err) printf("sem_init() failed: %s\n", strerror(err));
-  err = sem_init(&lock_sem, 0, 1);
-    if (err) printf("sem_init() failed: %s\n", strerror(err));
+  init_mutex(&mutex);
 
-  // err = pthread_create(&q->qmonitor_tid, NULL, qmonitor, q); 
+  // int err = pthread_create(&q->qmonitor_tid, NULL, qmonitor, q); 
   //  if (err) { 
   //    printf("queue_init: pthread_create() failed: %s\n", strerror(err)); 
   //    abort(); 
@@ -64,32 +56,30 @@ void queue_destroy(queue_t *q) {
     q->count--;
   }
 
-  int err = pthread_cancel(q->qmonitor_tid);
-  if (err) {
-    printf("queue_destroy(): pthread_cancel() failed: %s\n", strerror(err));
-  }
-
-  err = sem_destroy(&write_sem);
-  if(err) fprintf(stderr, "sem_destroy: failed %s\n", strerror(err));
-  err = sem_destroy(&read_sem);
-  if(err) fprintf(stderr, "sem_destroy: failed %s\n", strerror(err));  
-  err = sem_destroy(&lock_sem);
-  if(err) fprintf(stderr, "sem_destroy: failed %s\n", strerror(err));
+  /* int err = pthread_cancel(q->qmonitor_tid); */
+  /* if (err) { */
+  /*   printf("queue_destroy(): pthread_cancel() failed: %s\n", strerror(err));
+   */
+  /* } */
 
   free(q);
+  destroy_mutex(&mutex);
 }
 
 int queue_add(queue_t *q, int val) {
-
   q->add_attempts++;
-
   assert(q->count <= q->max_count);
 
-  sem_wait(&write_sem);
-  sem_wait(&lock_sem);
+  lock_mutex(&mutex);
 
-	// if (q->get_attempts % 7 == 0)
-  //   usleep(1);
+  if (q->count == q->max_count) {
+    unlock_mutex(&mutex);
+    return 0;
+  }
+
+
+  if (q->get_attempts % 7 == 0)
+    usleep(1);
 
   qnode_t *new = malloc(sizeof(qnode_t));
   if (!new) {
@@ -109,20 +99,23 @@ int queue_add(queue_t *q, int val) {
   q->count++;
   q->add_count++;
 
-  sem_post(&lock_sem);
-  sem_post(&read_sem);
+  unlock_mutex(&mutex);
 
   return 1;
 }
 
 int queue_get(queue_t *q, int *val) {
-
   q->get_attempts++;
 
   assert(q->count >= 0);
 
-  sem_wait(&read_sem);
-  sem_wait(&lock_sem);
+  lock_mutex(&mutex);
+
+
+  if (q->count == 0) {
+    unlock_mutex(&mutex);
+    return 0;
+  }
 
   qnode_t *tmp = q->first;
 
@@ -133,16 +126,28 @@ int queue_get(queue_t *q, int *val) {
   q->count--;
   q->get_count++;
 
-  sem_post(&lock_sem);
-  sem_post(&write_sem);
-
+  unlock_mutex(&mutex);
   return 1;
 }
 
 void queue_print_stats(queue_t *q) {
+  // int lock_status = pthread_mutex_lock(&mutex);
+  // if (lock_status != 0) {
+  //   fprintf(stderr, "Error during pthread_mutex_lock(); error code: %d\n",
+  //           lock_status);
+  //   abort();
+  // }
+
   printf("queue stats: current size %d; attempts: (%ld %ld %ld); counts (%ld "
          "%ld %ld)\n",
          q->count, q->add_attempts, q->get_attempts,
          q->add_attempts - q->get_attempts, q->add_count, q->get_count,
          q->add_count - q->get_count);
+
+  // int unlock_status = pthread_mutex_unlock(&mutex);
+  // if (unlock_status != 0) {
+  //   fprintf(stderr, "Error during pthread_mutex_unlock(); error code: %d\n",
+  //           unlock_status);
+  //   abort();
+  // }
 }

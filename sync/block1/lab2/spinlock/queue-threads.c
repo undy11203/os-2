@@ -15,7 +15,7 @@
 #define RED "\033[41m"
 #define NOCOLOR "\033[0m"
 
-#define MAX_OPER 123456789
+#define MAX_OPER 12345678
 
 void set_cpu(int n) {
   int err;

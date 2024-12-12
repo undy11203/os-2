@@ -1,8 +1,11 @@
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <pthread.h>
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <stdatomic.h>
 
 #include "linkedlist/linkedlist.h"
 
@@ -10,12 +13,26 @@ int ascending_counter = 0;
 int descending_counter = 0;
 int equal_counter = 0;
 
-int swap_counter = 0;
+atomic_int swap_counter1 = 0;
+atomic_int swap_counter2 = 0;
+atomic_int swap_counter3 = 0;
+
+
+typedef struct data
+{
+    Storage* storage;
+    atomic_int* i;
+} Data;
+
+#define MAX_OPER 1234567
+#define NUM_NODES 10
+
 
 void* ascending_length_count(void* arg) {
+
     Storage* storage = (Storage *) arg;
 
-    while (1) { 
+    for(int p = 0; p < MAX_OPER; p++){
         int k = 0;
         Node* current = storage->first;
         LOCK_LOCK(&current->sync);
@@ -41,9 +58,10 @@ void* ascending_length_count(void* arg) {
 }
 
 void* descending_length_count(void* arg) {
+
     Storage* storage = (Storage *) arg;
 
-    while (1) {
+    for(int p = 0; p < MAX_OPER; p++){
         int k = 0;
         Node* current = storage->first;
         LOCK_LOCK(&current->sync);
@@ -69,9 +87,10 @@ void* descending_length_count(void* arg) {
 }
 
 void* equal_length_count(void* arg) {
+
     Storage* storage = (Storage *) arg;
 
-    while (1) {
+    for(int p = 0; p < MAX_OPER; p++){
         int k = 0;
         Node* current = storage->first;
         LOCK_LOCK(&current->sync);
@@ -97,10 +116,12 @@ void* equal_length_count(void* arg) {
 }
 
 void* random_swap(void* arg) {
-    Storage* storage = (Storage *) arg;
+
+    Data* data = (Data *)arg;
+    Storage* storage = data->storage;
     unsigned int seed = (unsigned int)pthread_self();
 	
-    while (1) {
+    for(int p = 0; p < MAX_OPER; p++){
         int k = 0;
         Node* prev = storage->first;
         LOCK_LOCK(&prev->sync);
@@ -141,7 +162,7 @@ void* random_swap(void* arg) {
         }
 
         LOCK_UNLOCK(&prev->sync);
-        swap_counter++;
+        atomic_fetch_add(data->i, 1); 
 
         // printf("SWAP: %d k = %d\n", swap_counter, k);
     }
@@ -151,8 +172,8 @@ void* random_swap(void* arg) {
 
 void *count_monitor(void *arg) {
     while (1) {
-        printf("Ascending: %d, Descending: %d, Equal: %d Swap: %d\n", 
-                    ascending_counter, descending_counter, equal_counter, swap_counter);
+        printf("Ascending: %d, Descending: %d, Equal: %d Swap1: %d Swap2: %d Swap3: %d\n", 
+                    ascending_counter, descending_counter, equal_counter, atomic_load(&swap_counter1), atomic_load(&swap_counter2), atomic_load(&swap_counter3));
         sleep(1);
     }
 
@@ -160,9 +181,14 @@ void *count_monitor(void *arg) {
 }
 
 void fill_storage(Storage* storage, int num_nodes) {
+    srand(time(0));
     for (int i = 0; i < num_nodes; ++i) {
-        char buff[99];
-        sprintf(buff, "%d", i);
+        int length = rand() % 100;
+        char buff[100];
+        for (int j = 0; j < length; ++j) {
+            buff[j] = 'A' + rand() % 26;
+        }
+        buff[length] = '\0';
         storage_add(storage, buff);
     }
 }
@@ -171,9 +197,7 @@ int main() {
     Storage* storage = storage_init();
     int err;
 
-    storage_add(storage, "Hello");
-    storage_add(storage, "World");
-    fill_storage(storage, 100);
+    fill_storage(storage, NUM_NODES);
 
     pthread_t monitor;
     pthread_t equal_thread, ascending_thread, descending_thread;
@@ -201,17 +225,20 @@ int main() {
 		return -1;
 	}
 
-    err = pthread_create(&swap1, NULL, random_swap, storage);
+    Data data1 = {.storage = storage, .i = &swap_counter1};
+    err = pthread_create(&swap1, NULL, random_swap, &data1);
 	if (err) {
 		printf("main: pthread_create() failed: %s\n", strerror(err));
 		return -1;
 	}
-    err = pthread_create(&swap2, NULL, random_swap, storage);
+    Data data2 = {.storage = storage, .i = &swap_counter2};
+    err = pthread_create(&swap2, NULL, random_swap, &data2);
 	if (err) {
 		printf("main: pthread_create() failed: %s\n", strerror(err));
 		return -1;
 	}
-    err = pthread_create(&swap3, NULL, random_swap, storage);
+    Data data3 = {.storage = storage, .i = &swap_counter3};
+    err = pthread_create(&swap3, NULL, random_swap, &data3);
 	if (err) {
 		printf("main: pthread_create() failed: %s\n", strerror(err));
 		return -1;
@@ -225,9 +252,6 @@ int main() {
 	}
     if (pthread_join(descending_thread, NULL)) {
 		perror("pthread_join - descending_thread");
-	}
-    if (pthread_join(monitor, NULL)) {
-		perror("pthread_join - monitor");
 	}
 
     pthread_join(swap1, NULL);

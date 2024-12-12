@@ -6,6 +6,12 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdatomic.h>
+#include <string.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+#include <pthread.h>
+#include <sched.h>
 
 #include "linkedlist/linkedlist.h"
 
@@ -23,20 +29,21 @@ typedef struct data
     atomic_int* i;
 } Data;
 
-#define MAX_OPER 12345678
+#define MAX_OPER 1234567
 #define NUM_NODES 10
 
 
-void* ascending_length_count(void* arg) {
 
+void* ascending_length_count(void* arg) {
     Storage* storage = (Storage *) arg;
 
+    // while (1) { 
     for(int p = 0; p < MAX_OPER; p++){
         int k = 0;
         Node* current = storage->first;
-        LOCK_RLOCK(&current->sync);
+        LOCK_LOCK(&current->sync);
         while (current->next != NULL) {
-                LOCK_RLOCK(&current->next->sync);
+                LOCK_LOCK(&current->next->sync);
                 size_t currentLength = strlen(current->value);
                 size_t nextLength = strlen(current->next->value);
 
@@ -57,15 +64,15 @@ void* ascending_length_count(void* arg) {
 }
 
 void* descending_length_count(void* arg) {
-
     Storage* storage = (Storage *) arg;
 
+    // while (1) {
     for(int p = 0; p < MAX_OPER; p++){
         int k = 0;
         Node* current = storage->first;
-        LOCK_RLOCK(&current->sync);
+        LOCK_LOCK(&current->sync);
         while (current->next != NULL) {
-                LOCK_RLOCK(&current->next->sync);
+                LOCK_LOCK(&current->next->sync);
                 size_t currentLength = strlen(current->value);
                 size_t nextLength = strlen(current->next->value);
 
@@ -86,15 +93,15 @@ void* descending_length_count(void* arg) {
 }
 
 void* equal_length_count(void* arg) {
-
     Storage* storage = (Storage *) arg;
 
+    // while (1) {
     for(int p = 0; p < MAX_OPER; p++){
         int k = 0;
         Node* current = storage->first;
-        LOCK_RLOCK(&current->sync);
+        LOCK_LOCK(&current->sync);
         while (current->next != NULL) {
-                LOCK_RLOCK(&current->next->sync);
+                LOCK_LOCK(&current->next->sync);
                 size_t currentLength = strlen(current->value);
                 size_t nextLength = strlen(current->next->value);
 
@@ -120,10 +127,11 @@ void* random_swap(void* arg) {
     Storage* storage = data->storage;
     unsigned int seed = (unsigned int)pthread_self();
 	
+    // while (1) {
     for(int p = 0; p < MAX_OPER; p++){
         int k = 0;
         Node* prev = storage->first;
-        LOCK_WLOCK(&prev->sync);
+        LOCK_LOCK(&prev->sync);
         Node* current = prev->next;
 
         if (current == NULL) {
@@ -131,11 +139,11 @@ void* random_swap(void* arg) {
             continue;
         }
 
-        LOCK_WLOCK(&current->sync);
+        LOCK_LOCK(&current->sync);
 
         while (current->next != NULL) {
             Node* next = current->next;
-            LOCK_WLOCK(&next->sync);
+            LOCK_LOCK(&next->sync);
             
             if (rand_r(&seed) % 2 == 0) {
                 Node* tmp1 = current;

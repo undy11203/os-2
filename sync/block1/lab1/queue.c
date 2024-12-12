@@ -80,12 +80,14 @@ int queue_add(queue_t *q, int val) {
   if (!q->first)
     q->first = q->last = new;
   else {
+    //
     q->last->next = new;
     q->last = q->last->next;
   }
 
   q->count++;
   q->add_count++;
+  
 
   return 1;
 }

@@ -27,7 +27,6 @@ void storage_add(Storage* storage, const char* value);
 void storage_print(Storage* storage);
 void storage_destroy(Storage* storage);
 
-void swap_nodes(Node* prev, Node* current, Node* next);
 
 #define LOCK_INIT(lock) pthread_mutex_init(lock, NULL)
 #define LOCK_LOCK(lock) pthread_mutex_lock(lock)

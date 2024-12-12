@@ -1,7 +1,6 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <pthread.h>
-#include <semaphore.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,7 +10,7 @@
 #include <pthread.h>
 #include <sched.h>
 
-#include "queue.h"
+#include "queue/queue.h"
 
 #define RED "\033[41m"
 #define NOCOLOR "\033[0m"
@@ -45,7 +44,6 @@ void *reader(void *arg) {
   for (int i = 0; i < MAX_OPER; i++) {
     int val = -1;
     int ok = queue_get(q, &val);
-
     if (!ok)
       continue;
 
@@ -68,7 +66,6 @@ void *writer(void *arg) {
 
   for (int j = 0; j < MAX_OPER; j++) {
     int ok = queue_add(q, i);
-
     if (!ok)
       continue;
     i++;
@@ -85,7 +82,7 @@ int main() {
 
   printf("main [%d %d %d]\n", getpid(), getppid(), gettid());
 
-  q = queue_init(100000);
+  q = queue_init(1000);
 
   err = pthread_create(&tid_reader, NULL, reader, q);
   if (err) {

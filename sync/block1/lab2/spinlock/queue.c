@@ -94,8 +94,8 @@ int queue_add(queue_t *q, int val) {
     }
     return 0;
   }
-	// if (q->get_attempts % 7 == 0)
-  //   usleep(1);
+	if (q->get_attempts % 7 == 0)
+    usleep(1);
 
   qnode_t *new = malloc(sizeof(qnode_t));
   if (!new) {

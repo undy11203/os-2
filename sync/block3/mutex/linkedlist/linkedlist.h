@@ -10,12 +10,14 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "../mutex/mutex.h"
+
 #define LENGTH 100
 
 typedef struct _Node {
     char value[LENGTH];
     struct _Node* next;
-    pthread_spinlock_t sync;
+    mutex_t sync;
 } Node;
 
 typedef struct _Storage {
@@ -28,9 +30,9 @@ void storage_print(Storage* storage);
 void storage_destroy(Storage* storage);
 
 
-#define LOCK_INIT(lock) pthread_spin_init(lock, PTHREAD_PROCESS_SHARED)
-#define LOCK_LOCK(lock) pthread_spin_lock(lock)
-#define LOCK_UNLOCK(lock) pthread_spin_unlock(lock)
-#define LOCK_DESTROY(lock) pthread_spin_destroy(lock)
+#define LOCK_INIT(lock) init_mutex(lock)
+#define LOCK_LOCK(lock) lock_mutex(lock)
+#define LOCK_UNLOCK(lock) unlock_mutex(lock)
+#define LOCK_DESTROY(lock) destroy_mutex(lock)
 
 #endif

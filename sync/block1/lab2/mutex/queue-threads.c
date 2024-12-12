@@ -15,7 +15,7 @@
 #define RED "\033[41m"
 #define NOCOLOR "\033[0m"
 
-#define MAX_OPER 123456789
+#define MAX_OPER 12345678
 
 void set_cpu(int n) {
   int err;
@@ -82,7 +82,7 @@ int main() {
 
   printf("main [%d %d %d]\n", getpid(), getppid(), gettid());
 
-  q = queue_init(100000);
+  q = queue_init(1000);
 
   err = pthread_create(&tid_reader, NULL, reader, q);
   if (err) {

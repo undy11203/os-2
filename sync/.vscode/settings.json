@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "mutex": "cpp",
+        "queue.h": "c"
+    },
+    "C_Cpp.default.compileCommands": "/home/user/project/os/sync/proxy/builddir/compile_commands.json",
+    "C_Cpp.default.configurationProvider": "mesonbuild.mesonbuild"
+}
